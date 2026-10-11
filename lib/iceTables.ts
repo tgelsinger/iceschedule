@@ -10,14 +10,19 @@ export const TARGETS = [
     label: "Ice For Sale",
     url: "https://www.psmha.ca/iceforsale",
     heading: null,
+    iceType: "practice",
   },
   {
     key: "swap120",
     label: "120+ min Ice Swap Board",
     url: "https://www.psmha.ca/iceschedule",
     heading: /^120\+\s*min/i,
+    iceType: "game_swap",
   },
-] as const satisfies readonly { key: string; label: string; url: string; heading: RegExp | null }[];
+] as const satisfies readonly { key: string; label: string; url: string; heading: RegExp | null; iceType: IceType }[];
+
+// Stored in ice_availability.ice_type (CHECK constraint allows only these).
+export type IceType = "practice" | "game_swap";
 
 type Target = (typeof TARGETS)[number];
 
