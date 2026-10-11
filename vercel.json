@@ -1,3 +1,6 @@
 {
-  "crons": [{ "path": "/api/cron/save-ice", "schedule": "0 12 * * *" }]
+  "crons": [
+    { "path": "/api/cron/save-ice?run=am", "schedule": "0 11 * * *" },
+    { "path": "/api/cron/save-ice?run=pm", "schedule": "0 2 * * *" }
+  ]
 }

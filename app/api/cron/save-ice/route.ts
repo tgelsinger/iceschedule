@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { notifyNew } from "@/lib/notify";
 import { saveAll } from "@/lib/saveIce";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const results = await saveAll();
-  const ok = results.every((r) => r.readable && !r.error);
-  return NextResponse.json({ ok, results }, { status: ok ? 200 : 503 });
+  // Runs even if one source failed: the other source's new rows are still worth sending.
+  const notify = await notifyNew().catch((e) => ({ notified: 0, skipped: null, error: e instanceof Error ? e.message : String(e) }));
+  const ok = results.every((r) => r.readable && !r.error) && !notify.error;
+  return NextResponse.json({ ok, results, notify }, { status: ok ? 200 : 503 });
 }
