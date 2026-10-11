@@ -81,6 +81,23 @@ vercel.json           Cron: /api/cron/save-ice daily at 12:00 UTC (06:00 in Regi
 - Column headers are matched by regex (`/^date$/`, `/^start/`, `/^duration/`, `/^(location|rink|arena)/`), so small header changes still work.
 - Current headers: Ice For Sale has `Date, Start Time, Duration, Location, Cost`. The swap board has `Date, Day of Week, Start Time, Duration, Location, Status, Posted`.
 
+## Deployment
+
+- GitHub `tgelsinger/iceschedule` is connected to a single Vercel project, `iceschedule`, under the `bigt2` team. A second project, `psmhaiceschedule`, was a duplicate and was deleted on 2026-10-11.
+- Pushing a non-`main` branch creates a **Preview** deployment, and pushing to `main` creates **Production**. Vercel runs cron jobs **only on Production**, so the save cron job runs only once this code is on `main`.
+- Every deployment URL, preview and production, is behind Vercel Authentication (SSO). Calls from outside, such as `curl`, get a 302 redirect to `vercel.com/sso-api`. Vercel's own cron calls aren't affected.
+- Env vars needed in the project: `DATABASE_URL`, plus `CRON_SECRET`, which is recommended. `lib/db.ts` throws on import if `DATABASE_URL` is missing, so a missing value makes the build fail during "Collecting page data".
+- To confirm saves are running, check that `max(last_seen_at)` in `ice_availability` moves forward after 12:00 UTC each day, or look at the cron logs in Vercel → Project → Settings → Cron Jobs.
+- `npm warn deprecated whatwg-encoding@3.1.1` during install comes from `cheerio → encoding-sniffer → whatwg-encoding`. It's harmless and we can't act on it until cheerio updates.
+
+### Deployment status (2026-10-11 15:10 UTC)
+
+| Project | Production | Preview of `3aca5a6` (add-neon-db) |
+| --- | --- | --- |
+| `iceschedule` | `4760d84` (initial commit, no save code) | Built successfully |
+
+The save cron job is not running yet because `add-neon-db` hasn't been merged into `main`. The database has had no writes from Vercel: the latest `last_seen_at` is 15:02 UTC, from a local run.
+
 ## Commands
 
 ```sh
@@ -104,6 +121,8 @@ There are no tests and no lint config yet. To run a save locally, start `npm run
 
 Newest first. Use the format `YYYY-MM-DD: summary (files)`.
 
+- **2026-10-11**: Deleted the duplicate Vercel project `psmhaiceschedule`. Only `iceschedule` remains. (`AGENTS.md`)
+- **2026-10-11**: Checked the deployment after the user redeployed. Production on both Vercel projects is still `4760d84` and has no save route. The `3aca5a6` preview built on `iceschedule` and failed on `psmhaiceschedule`. Previews are behind SSO and don't run crons, so nothing has saved from Vercel yet. Added the Deployment section and documented the `whatwg-encoding` warning. (`AGENTS.md`)
 - **2026-10-11**: Added the `ice_type` column to `ice_availability` (text NOT NULL, CHECK in (`practice`, `game_swap`)), ran in Neon as a transaction. The 3 existing `iceforsale` rows were backfilled to `practice`. `TARGETS` now has `iceType` and the upsert writes it. To add a new ice type, update the CHECK constraint and the `IceType` union together. (`lib/iceTables.ts`, `lib/saveIce.ts`, `AGENTS.md`)
 - **2026-10-11**: Listings are now saved to Neon `ice_availability`. Added `lib/saveIce.ts`, which upserts by `(source, slot_key)` and marks missing slots unavailable, plus the cron route `app/api/cron/save-ice/route.ts` and a daily cron in `vercel.json`. The table was created by hand in Neon before this change. Tested against live data: 3 Ice For Sale rows saved, re-runs don't create duplicates, and a stale row was marked unavailable. Also fixed a `ppostgresql://` typo in the local `.env.local` `DATABASE_URL`. (`lib/saveIce.ts`, `app/api/cron/save-ice/route.ts`, `vercel.json`, `AGENTS.md`)
 - **2026-10-11**: Added this AGENTS.md as the repo memory.
