@@ -101,7 +101,7 @@ vercel.json           Cron: /api/cron/save-ice hourly, as 24 once-a-day entries 
 
 ### Deployment status (2026-10-12 12:48 UTC)
 
-- Production (`iceschedule`) runs `87c3d58`, with email notifications and the 11:00/02:00 UTC cron jobs. The hourly schedule (24 entries) takes effect once it's deployed to `main`. `RESEND_API_KEY` and `NOTIFY_EMAIL_TO` are set for Production.
+- Production (`iceschedule`) runs `0f74166`, with email notifications and the hourly cron (24 entries). Deployed from a push to `main` on 2026-10-12. `RESEND_API_KEY` and `NOTIFY_EMAIL_TO` are set for Production.
 - Verified end to end: a manual cron run at 12:47 UTC saved listings, and Resend accepted the new-listing email (`notified_at` was set).
 - Gotcha: a dashboard **Redeploy** rebuilds the deployment you click, not the latest commit. On 2026-10-11 a redeploy left Production on `9855ebe` (old 12:00 UTC cron job, no email code). To check, Settings → Cron Jobs should list 24 entries, `?h=00` to `?h=23`. Redeploys started from the dashboard don't show up in GitHub's deployments list.
 
