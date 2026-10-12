@@ -99,11 +99,11 @@ vercel.json           Cron: /api/cron/save-ice at 05:00 and 20:00 Saskatchewan t
 - To confirm saves are running, check that `max(last_seen_at)` in `ice_availability` moves forward after each run (11:00 and 02:00 UTC), or look at the cron logs in Vercel → Project → Settings → Cron Jobs.
 - `npm warn deprecated whatwg-encoding@3.1.1` during install comes from `cheerio → encoding-sniffer → whatwg-encoding`. It's harmless and we can't act on it until cheerio updates.
 
-### Deployment status (2026-10-11 15:14 UTC)
+### Deployment status (2026-10-12 12:48 UTC)
 
-- Production (`iceschedule`) is `9855ebe` and built successfully at 15:13 UTC. The alias is `iceschedule-bigt2.vercel.app`, behind SSO. It includes `/api/cron/save-ice` and the old single cron job at 12:00 UTC. The new 05:00/20:00 schedule takes effect only after it's deployed to `main`.
-- Not yet verified that the cron job has written to the database. The first write from Vercel will be from a manual run (Vercel → Settings → Cron Jobs → Run) or the first scheduled run after the new schedule is deployed.
-- `psmhaiceschedule` still built a failed preview of `9855ebe` at 15:13 UTC, while it was being deleted.
+- Production (`iceschedule`) runs `87c3d58`, with email notifications and the 11:00/02:00 UTC cron jobs. `RESEND_API_KEY` and `NOTIFY_EMAIL_TO` are set for Production.
+- Verified end to end: a manual cron run at 12:47 UTC saved listings, and Resend accepted the new-listing email (`notified_at` was set).
+- Gotcha: a dashboard **Redeploy** rebuilds the deployment you click, not the latest commit. On 2026-10-11 a redeploy left Production on `9855ebe` (old 12:00 UTC cron job, no email code). To check, Settings → Cron Jobs should list two entries, `?run=am` and `?run=pm`. Redeploys started from the dashboard don't show up in GitHub's deployments list.
 
 ## Commands
 
@@ -129,6 +129,7 @@ There are no tests and no lint config yet. To run a save locally, start `npm run
 
 Newest first. Use the format `YYYY-MM-DD: summary (files)`.
 
+- **2026-10-12**: Verified email notifications in Production. Production had been on `9855ebe` after a dashboard redeploy of the wrong deployment. After `87c3d58` was redeployed, a manual cron run saved listings and sent the email. Updated the Deployment status. (`AGENTS.md`)
 - **2026-10-11**: Added email notifications for new listings. Added `lib/notify.ts`, which the cron route calls after `saveAll()`. In Neon, added `ice_availability.notified_at` (timestamptz, nullable) and backfilled the 3 existing rows to `first_seen_at`. Tested locally: with no new rows nothing is sent, and when the send fails (fake key, Resend 401) the claim is released. A real email was sent through Resend (test sender `onboarding@resend.dev`), and a second run right after sent nothing. (`lib/notify.ts`, `app/api/cron/save-ice/route.ts`, `AGENTS.md`)
 - **2026-10-11**: Changed the cron schedule from once a day at 12:00 UTC to twice a day, at 05:00 and 20:00 Saskatchewan time (`0 11 * * *` and `0 2 * * *` UTC). (`vercel.json`, `AGENTS.md`)
 - **2026-10-11**: Merged `add-neon-db` into `main` (fast-forward to `9855ebe`). The `iceschedule` Production deployment succeeded. (`AGENTS.md`)
