@@ -14,7 +14,7 @@ This is the reference for anyone, human or agent, working in this repo. Read it 
 
 The app parses nothing else on either page. A table counts as **readable** when the page returns HTTP 200 and the table is found with its column headers. An empty table still counts as readable.
 
-A Vercel Cron job (twice a day) also saves the listings to the Neon Postgres table `ice_availability` (see **Database**) and emails any newly added listings (see **Notifications**).
+A Vercel Cron job (hourly) also saves the listings to the Neon Postgres table `ice_availability` (see **Database**) and emails any newly added listings (see **Notifications**).
 
 ## Stack
 
@@ -38,7 +38,7 @@ lib/
   saveIce.ts          Maps parsed rows to ice_availability and upserts them (saveAll). Parsers: parseIceDate, parseDuration, addMinutes, toSlot
   notify.ts           notifyNew(): emails never-notified available slots via Resend, deduped by ice_availability.notified_at
   db.ts               Neon client: exports `sql` tagged template. Throws on import if DATABASE_URL is missing
-vercel.json           Cron: /api/cron/save-ice at 05:00 and 20:00 Saskatchewan time (11:00 and 02:00 UTC). These are two once-a-day entries, `?run=am` and `?run=pm`; the route ignores the query
+vercel.json           Cron: /api/cron/save-ice hourly, as 24 once-a-day entries (`0 H * * *`, paths `?h=00`…`?h=23`), because Hobby rejects schedules that run more than once a day. The query only makes each path unique; the route ignores it
 ```
 
 ## Key behaviour (lib/iceTables.ts)
@@ -96,14 +96,14 @@ vercel.json           Cron: /api/cron/save-ice at 05:00 and 20:00 Saskatchewan t
 - Pushing a non-`main` branch creates a **Preview** deployment, and pushing to `main` creates **Production**. Vercel runs cron jobs **only on Production**, so the save cron job runs only once this code is on `main`.
 - Every deployment URL, preview and production, is behind Vercel Authentication (SSO). Calls from outside, such as `curl`, get a 302 redirect to `vercel.com/sso-api`. Vercel's own cron calls aren't affected.
 - Env vars needed in the project: `DATABASE_URL`, plus `CRON_SECRET`, which is recommended, and `RESEND_API_KEY` and `NOTIFY_EMAIL_TO` for emails. `lib/db.ts` throws on import if `DATABASE_URL` is missing, so a missing value makes the build fail during "Collecting page data".
-- To confirm saves are running, check that `max(last_seen_at)` in `ice_availability` moves forward after each run (11:00 and 02:00 UTC), or look at the cron logs in Vercel → Project → Settings → Cron Jobs.
+- To confirm saves are running, check that `max(last_seen_at)` in `ice_availability` moves forward every hour, or look at the cron logs in Vercel → Project → Settings → Cron Jobs.
 - `npm warn deprecated whatwg-encoding@3.1.1` during install comes from `cheerio → encoding-sniffer → whatwg-encoding`. It's harmless and we can't act on it until cheerio updates.
 
 ### Deployment status (2026-10-12 12:48 UTC)
 
-- Production (`iceschedule`) runs `87c3d58`, with email notifications and the 11:00/02:00 UTC cron jobs. `RESEND_API_KEY` and `NOTIFY_EMAIL_TO` are set for Production.
+- Production (`iceschedule`) runs `87c3d58`, with email notifications and the 11:00/02:00 UTC cron jobs. The hourly schedule (24 entries) takes effect once it's deployed to `main`. `RESEND_API_KEY` and `NOTIFY_EMAIL_TO` are set for Production.
 - Verified end to end: a manual cron run at 12:47 UTC saved listings, and Resend accepted the new-listing email (`notified_at` was set).
-- Gotcha: a dashboard **Redeploy** rebuilds the deployment you click, not the latest commit. On 2026-10-11 a redeploy left Production on `9855ebe` (old 12:00 UTC cron job, no email code). To check, Settings → Cron Jobs should list two entries, `?run=am` and `?run=pm`. Redeploys started from the dashboard don't show up in GitHub's deployments list.
+- Gotcha: a dashboard **Redeploy** rebuilds the deployment you click, not the latest commit. On 2026-10-11 a redeploy left Production on `9855ebe` (old 12:00 UTC cron job, no email code). To check, Settings → Cron Jobs should list 24 entries, `?h=00` to `?h=23`. Redeploys started from the dashboard don't show up in GitHub's deployments list.
 
 ## Commands
 
@@ -122,13 +122,14 @@ There are no tests and no lint config yet. To run a save locally, start `npm run
 - Write server components and route handlers with `export const dynamic = "force-dynamic"` so the data is always live.
 - Code style is small, dense TypeScript, with comments only where the reason isn't obvious.
 - Only the cron route writes to the database. Pages and `/api/check` stay read-only.
-- Vercel Hobby only allows each cron entry to run once a day, so separate run times are separate entries. Hobby may also fire the job at any point within the scheduled hour (for example 05:00–05:59). If you need exact times or a higher frequency, use Pro or an external scheduler that calls the route with the secret.
+- Vercel Hobby only allows each cron entry to run once a day (100 entries per project), so separate run times are separate entries. That's how the hourly schedule works. Hobby may also fire the job at any point within the scheduled hour (for example 05:00–05:59). If you need exact times or a higher frequency, use Pro or an external scheduler that calls the route with the secret.
 - Cron schedules are in UTC. Saskatchewan (`America/Regina`) is UTC−6 all year, with no daylight saving, so the conversion never changes.
 
 ## Change log
 
 Newest first. Use the format `YYYY-MM-DD: summary (files)`.
 
+- **2026-10-12**: Cron now runs hourly as 24 once-a-day entries, replacing the 05:00/20:00 SK pair. Each run can send at most one new-listing email, so overnight emails are possible. (`vercel.json`, `AGENTS.md`)
 - **2026-10-12**: Verified email notifications in Production. Production had been on `9855ebe` after a dashboard redeploy of the wrong deployment. After `87c3d58` was redeployed, a manual cron run saved listings and sent the email. Updated the Deployment status. (`AGENTS.md`)
 - **2026-10-11**: Added email notifications for new listings. Added `lib/notify.ts`, which the cron route calls after `saveAll()`. In Neon, added `ice_availability.notified_at` (timestamptz, nullable) and backfilled the 3 existing rows to `first_seen_at`. Tested locally: with no new rows nothing is sent, and when the send fails (fake key, Resend 401) the claim is released. A real email was sent through Resend (test sender `onboarding@resend.dev`), and a second run right after sent nothing. (`lib/notify.ts`, `app/api/cron/save-ice/route.ts`, `AGENTS.md`)
 - **2026-10-11**: Changed the cron schedule from once a day at 12:00 UTC to twice a day, at 05:00 and 20:00 Saskatchewan time (`0 11 * * *` and `0 2 * * *` UTC). (`vercel.json`, `AGENTS.md`)
